@@ -28,7 +28,7 @@ app.add_middleware(
 
 # CORS
 # origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
-origins = [o.strip() for o in os.getenv("CORS_ORIGINS","http://localhost:3000").split(",") if o.strip()]
+origins = [o.strip() for o in os.getenv("CORS_ORIGINS","https://ai-agent-for-financial-advisors-frontend.onrender.com").split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
