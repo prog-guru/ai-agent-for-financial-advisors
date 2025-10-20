@@ -1,0 +1,117 @@
+# =====================================
+# Python
+# =====================================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# =====================================
+# Environment
+# =====================================
+.env
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# =====================================
+# PyInstaller
+# =====================================
+*.manifest
+*.spec
+
+# =====================================
+# Installer logs
+# =====================================
+pip-log.txt
+pip-delete-this-directory.txt
+
+# =====================================
+# Unit test / coverage reports
+# =====================================
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# =====================================
+# Jupyter Notebook
+# =====================================
+.ipynb_checkpoints
+
+# =====================================
+# pyenv
+# =====================================
+.python-version
+
+# =====================================
+# VSCode / IDE
+# =====================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =====================================
+# mypy / type checking
+# =====================================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# =====================================
+# FastAPI / app specific
+# =====================================
+# SQLite databases
+*.db
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Static files (if auto-generated)
+staticfiles/
+media/
+uploads/
+
+# =====================================
+# Docker
+# =====================================
+Dockerfile~
+docker-compose.yml~
+*.dockerfile
+*.env.docker
+.dockerignore
+
+# =====================================
+# Build artifacts
+# =====================================
+build/
+dist/
+*.egg-info/
+.eggs/
+MANIFEST
+
+# =====================================
+# Others
+# =====================================
+*.tmp
+*.bak
+*.old
