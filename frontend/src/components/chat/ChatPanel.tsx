@@ -65,8 +65,11 @@ export default function ChatPanel() {
           setMeetings(ms);
           setMessages(msgs);
         }
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message ?? "Failed to load");
+      } catch (e: unknown) {
+        if (!cancelled) {
+          const message = e instanceof Error ? e.message : "Failed to load";
+          setError(message);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -121,8 +124,9 @@ export default function ChatPanel() {
         setMeetings(res.meetings);
       }
       setQuery("");
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to send");
+  } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to send";
+      setError(message);
     } finally {
       setSending(false);
     }
@@ -136,8 +140,9 @@ export default function ChatPanel() {
       setMessages(res.messages);
       setMeetings(res.meetings);
       setQuery("");
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to clear chat");
+  } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to clear chat";
+      setError(message);
     }
   }
 

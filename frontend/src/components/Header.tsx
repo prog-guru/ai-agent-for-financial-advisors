@@ -8,7 +8,7 @@ const API = process.env.NEXT_PUBLIC_API_URL!;
 
 export default function Header() {
   const [me, setMe] = useState<MeResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  // const [loading, setLoading] = useState(true);
   const [hubspotConnected, setHubspotConnected] = useState(false);
   const [connectingHubspot, setConnectingHubspot] = useState(false);
 
@@ -17,7 +17,7 @@ export default function Header() {
     getMe()
       .then(setMe)
       .catch(() => setMe({ authenticated: false }))
-      .finally(() => setLoading(false));
+      // .finally(() => setLoading(false));
     
     checkHubspotConnection();
   }, []);

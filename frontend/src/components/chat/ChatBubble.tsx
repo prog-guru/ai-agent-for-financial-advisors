@@ -1,7 +1,6 @@
 // components/chat/ChatBubble.tsx
 import React from "react";
-
-type Message = { id: string; role: "system" | "assistant" | "user"; content: string };
+import type { Message } from "@/lib/api";
 
 function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");

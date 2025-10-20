@@ -52,14 +52,18 @@ async function request<T>(
   let res: Response;
   try {
     res = await fetch(url, merged as RequestInit);
-  } catch (e: any) {
+  } catch (e: unknown) {
     clearTimeout(timeout);
-    throw new Error(e?.name === "AbortError" ? "Request timed out" : `Network error: ${e?.message || e}`);
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error("Request timed out");
+    }
+    const message = e instanceof Error ? e.message : String(e);
+    throw new Error(`Network error: ${message}`);
   } finally {
     clearTimeout(timeout);
   }
 
-  let payload: any = null;
+  let payload: unknown = null;
   const text = await res.text();
   try {
     payload = text ? JSON.parse(text) : null;
@@ -68,7 +72,11 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    const detail = payload?.detail || payload?.message || res.statusText || "Request failed";
+    const detail =
+      (typeof payload === "object" && payload !== null && "detail" in payload && (payload as any).detail) ||
+      (typeof payload === "object" && payload !== null && "message" in payload && (payload as any).message) ||
+      res.statusText ||
+      "Request failed";
     throw new Error(`${res.status} ${detail}`);
   }
 

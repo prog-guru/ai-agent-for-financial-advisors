@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import { getMe, loginWithGoogle, type MeResponse } from "@/lib/auth";
-import Image from "next/image";
+// Image is currently unused in this page
 
 export default function ChatPage() {
   const [me, setMe] = useState<MeResponse | null>(null);

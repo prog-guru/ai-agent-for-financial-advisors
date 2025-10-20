@@ -2,9 +2,10 @@
 import React from "react";
 import Avatar from "./parts/Avatar";
 import { timeRange } from "@/lib/utils";
+import type { Person as ApiPerson } from "@/lib/api";
 
-type Person = { id: string; name: string; avatar?: string };
-type Meeting = { id: string; title: string; start: string; end: string; attendees: Person[] };
+type Person = ApiPerson;
+type Meeting = { id: number | string; title: string; start: string; end: string; attendees: Person[] };
 
 export default function MeetingCard({ m }: { m: Meeting }) {
   return (

@@ -10,7 +10,8 @@ export function cx(...c: (string | false | null | undefined)[]) {
     return `${t(s)} – ${t(e)}`;
   }
   
-  type Meeting = { id: string; title: string; start: string; end: string; attendees: any[] };
+  import type { Person } from "@/lib/api";
+  type Meeting = { id: string; title: string; start: string; end: string; attendees: Person[] };
   
   export function groupByDay(list: Meeting[]) {
     const label = (d: Date) => d.toLocaleDateString([], { day: "numeric", weekday: "long" }); // "8 Thursday"

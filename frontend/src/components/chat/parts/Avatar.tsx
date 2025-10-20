@@ -1,17 +1,18 @@
 // components/chat/parts/Avatar.tsx
 import React from "react";
-
-type Person = { id: string; name: string; avatar?: string };
+import Image from "next/image";
+import type { Person } from "@/lib/api";
 
 export default function Avatar({ person, size = 24 }: { person: Person; size?: number }) {
   const initials = person.name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
   if (person.avatar) {
     return (
-      <img
+      <Image
         src={person.avatar}
         alt={person.name}
+        width={size}
+        height={size}
         className="rounded-full object-cover"
-        style={{ width: size, height: size }}
       />
     );
   }
