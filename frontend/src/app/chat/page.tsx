@@ -10,11 +10,12 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // kick off the fetch
     getMe()
       .then(setMe)
       .catch(() => setMe({ authenticated: false }))
       .finally(() => setLoading(false));
-    
+  
   }, []);
 
   if (loading) {

@@ -1,13 +1,23 @@
 # app/main.py
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from httpx import Request
+from jose import jwt
 from starlette.middleware.sessions import SessionMiddleware
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from .db import Base, engine, get_settings, get_db
 from .seed import seed
 from .routers import health, meetings, chat, auth, hubspot, admin, gmail_calendar
 
 import os
+from dotenv import load_dotenv
+
+# Load .env from the project root (adjust path if needed)
+load_dotenv()  # or load_dotenv(dotenv_path="/absolute/path/.env")
+
 
 os.environ['HTTP_PROXY'] = 'socks5://14ac63464dbca:b9e059af46@64.84.118.137:12324'
 os.environ['HTTPS_PROXY'] = 'socks5://14ac63464dbca:b9e059af46@64.84.118.137:12324'
@@ -28,7 +38,9 @@ app.add_middleware(
 
 # CORS
 # origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
-origins = [o.strip() for o in os.getenv("CORS_ORIGINS","https://ai-agent-for-financial-advisors-frontend.onrender.com").split(",") if o.strip()]
+origins = [o.strip() for o in os.getenv("CORS_ORIGINS","").split(",") if o.strip()]
+
+print(origins)
 
 app.add_middleware(
     CORSMiddleware,
