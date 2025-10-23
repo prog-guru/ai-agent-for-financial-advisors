@@ -10,6 +10,8 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+
+    console.log("SHitCookie:", document.cookie)
     // kick off the fetch
     getMe()
       .then(setMe)

@@ -142,21 +142,19 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     return resp
 
 def _set_session_cookie(resp: RedirectResponse, value: str, frontend_origin: str, request: Request):
-    """Try to set cookie - might work in same domain setups"""
+    """Set session cookie with proper cross-domain settings"""
+    frontend_parsed = urlparse(frontend_origin)
+    is_production = frontend_parsed.hostname not in ["localhost", "127.0.0.1"]
+    
     cookie_options = {
         "key": SESSION_COOKIE,
         "value": value,
-        "httponly": False,  # Set to False so frontend can read it if needed
-        "samesite": "lax",
-        "secure": False,    # False for localhost
+        "httponly": True,
+        "samesite": "none" if is_production else "lax",  # 'none' required for cross-domain
+        "secure": is_production,  # Must be True when samesite=none
         "path": "/",
         "max_age": 60 * 60 * 24 * 30,
     }
-    
-    # For localhost, don't set domain
-    frontend_parsed = urlparse(frontend_origin)
-    if frontend_parsed.hostname not in ["localhost", "127.0.0.1"]:
-        cookie_options["domain"] = frontend_parsed.hostname
     
     resp.set_cookie(**cookie_options)
 
@@ -203,12 +201,16 @@ async def create_session(request: Request, db: Session = Depends(get_db)):
             "user": user_response
         })
         
+        # Detect if production based on request origin
+        origin = request.headers.get("origin", "")
+        is_production = "localhost" not in origin and "127.0.0.1" not in origin
+        
         resp.set_cookie(
             key=SESSION_COOKIE,
             value=token,
             httponly=True,
-            samesite="lax",
-            secure=False,
+            samesite="none" if is_production else "lax",
+            secure=is_production,
             path="/",
             max_age=60 * 60 * 24 * 30,
         )
@@ -283,7 +285,7 @@ def debug_cookies(request: Request):
     }
 
 @router.get("/debug/create-test-session")
-def create_test_session():
+def create_test_session(request: Request):
     """Manually create a test session"""
     test_jwt = make_session_jwt(
         sub="test-sub-123",
@@ -292,13 +294,16 @@ def create_test_session():
         picture=""
     )
     
+    origin = request.headers.get("origin", "")
+    is_production = "localhost" not in origin and "127.0.0.1" not in origin
+    
     resp = JSONResponse({"status": "test_session_created"})
     resp.set_cookie(
         key=SESSION_COOKIE,
         value=test_jwt,
         httponly=True,
-        samesite="lax",
-        secure=False,
+        samesite="none" if is_production else "lax",
+        secure=is_production,
         path="/",
         max_age=60 * 60 * 24 * 30,
     )

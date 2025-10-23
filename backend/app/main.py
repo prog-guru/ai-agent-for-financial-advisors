@@ -19,8 +19,9 @@ from dotenv import load_dotenv
 load_dotenv()  # or load_dotenv(dotenv_path="/absolute/path/.env")
 
 
-os.environ['HTTP_PROXY'] = 'socks5://14ac63464dbca:b9e059af46@64.84.118.137:12324'
-os.environ['HTTPS_PROXY'] = 'socks5://14ac63464dbca:b9e059af46@64.84.118.137:12324'
+# REMOVE IN PRODUCTION - Only for local development if needed
+# os.environ['HTTP_PROXY'] = 'socks5://14ac63464dbca:b9e059af46@64.84.118.137:12324'
+# os.environ['HTTPS_PROXY'] = 'socks5://14ac63464dbca:b9e059af46@64.84.118.137:12324'
 
 
 settings = get_settings()

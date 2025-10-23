@@ -13,14 +13,16 @@ export default function Header() {
   const [connectingHubspot, setConnectingHubspot] = useState(false);
 
   useEffect(() => {
-    // Only run on client side
     getMe()
-      .then(setMe)
+      .then((data) => {
+        setMe(data);
+        // Only check HubSpot if user is authenticated
+        if (data.authenticated) {
+          checkHubspotConnection();
+        }
+      })
       .catch(() => setMe({ authenticated: false }))
       .finally(() => setLoading(false));
-
-    console.log("Header Me: ", me);
-    checkHubspotConnection();
   }, []);
 
   const checkHubspotConnection = async () => {

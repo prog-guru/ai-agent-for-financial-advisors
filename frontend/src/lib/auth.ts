@@ -18,12 +18,14 @@ export type SessionResponse = {
 
 
 export async function getMe(): Promise<MeResponse> {
+  console.log("Cookie", document.cookie);
   const res = await fetch(`${API}/auth/me`, {
     credentials: "include",
     cache: "no-store",
     headers: {
       "cache-control": "no-cache",
       pragma: "no-cache",
+      "cookie": document.cookie
     },
   });
   return res.json();
