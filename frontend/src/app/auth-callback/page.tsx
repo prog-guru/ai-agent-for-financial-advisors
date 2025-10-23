@@ -23,10 +23,8 @@ export default function AuthCallbackPage() {
           
           if (userData.authenticated) {
             console.log('Authentication successful:', userData.user.email);
-            // Remove token from URL for security
-            window.history.replaceState({}, '', '/');
-            // Redirect to chat/dashboard page
-            router.push('/chat');
+            // Force a hard redirect to ensure cookies are properly set
+            window.location.href = '/chat';
           } else {
             console.error('Authentication failed');
             router.push('/login?error=auth_failed');
