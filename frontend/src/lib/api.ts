@@ -23,7 +23,7 @@ export type ChatSendResponse = {
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 if (!API_BASE) {
   console.warn(
-    "NEXT_PUBLIC_API_URL is not set. Set it in .env.local, e.g. NEXT_PUBLIC_API_URL=http://localhost:8000/api"
+    "NEXT_PUBLIC_API_URL is not set. Set it in .env.local, e.g. NEXT_PUBLIC_API_URL=http://localhost:8001/api"
   );
 }
 

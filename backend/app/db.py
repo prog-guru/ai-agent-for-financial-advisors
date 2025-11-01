@@ -7,7 +7,7 @@ import os
 
 class Settings(BaseSettings):
     API_V1: str = "/api"
-    DATABASE_URL: str = "sqlite:///./data.db"
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./data.db")
     CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "")
     HUBSPOT_CLIENT_ID: str = os.getenv("HUBSPOT_CLIENT_ID", "")
     HUBSPOT_CLIENT_SECRET: str = os.getenv("HUBSPOT_CLIENT_SECRET", "")

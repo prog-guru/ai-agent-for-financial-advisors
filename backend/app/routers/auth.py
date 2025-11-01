@@ -1,5 +1,5 @@
 # app/routers/auth.py
-from fastapi import APIRouter, Depends, Request, HTTPException, status
+from fastapi import APIRouter, Depends, Request, HTTPException, status, BackgroundTasks
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from authlib.integrations.base_client.errors import MismatchingStateError
@@ -41,7 +41,7 @@ def build_callback_url(request: Request) -> str:
     return str(url)
 
 @router.get("/google/callback", name="google_callback")
-async def google_callback(request: Request, db: Session = Depends(get_db)):
+async def google_callback(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Google OAuth callback - WORKING VERSION that passes token to frontend
     """
@@ -111,6 +111,10 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         print("!!!!!!!!!!!!!!!!!!=> refresh token: ", ga.refresh_token)
         db.commit()
         logger.info("DATABASE_SAVED: user_id=%s", user.id)
+        
+        # Auto-sync Gmail data in background
+        background_tasks.add_task(auto_sync_gmail_data, user.id)
+        logger.info("AUTO_SYNC_STARTED: user_id=%s", user.id)
 
     except Exception as e:
         db.rollback()
@@ -142,19 +146,21 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     return resp
 
 def _set_session_cookie(resp: RedirectResponse, value: str, frontend_origin: str, request: Request):
-    """Set session cookie with proper cross-domain settings"""
-    frontend_parsed = urlparse(frontend_origin)
-    is_production = frontend_parsed.hostname not in ["localhost", "127.0.0.1"]
-    
+    """Try to set cookie - might work in same domain setups"""
     cookie_options = {
         "key": SESSION_COOKIE,
         "value": value,
-        "httponly": True,
-        "samesite": "none" if is_production else "lax",  # 'none' required for cross-domain
-        "secure": is_production,  # Must be True when samesite=none
+        "httponly": False,  # Set to False so frontend can read it if needed
+        "samesite": "lax",
+        "secure": False,    # False for localhost
         "path": "/",
         "max_age": 60 * 60 * 24 * 30,
     }
+    
+    # For localhost, don't set domain
+    frontend_parsed = urlparse(frontend_origin)
+    if frontend_parsed.hostname not in ["localhost", "127.0.0.1"]:
+        cookie_options["domain"] = frontend_parsed.hostname
     
     resp.set_cookie(**cookie_options)
 
@@ -201,16 +207,12 @@ async def create_session(request: Request, db: Session = Depends(get_db)):
             "user": user_response
         })
         
-        # Detect if production based on request origin
-        origin = request.headers.get("origin", "")
-        is_production = "localhost" not in origin and "127.0.0.1" not in origin
-        
         resp.set_cookie(
             key=SESSION_COOKIE,
             value=token,
             httponly=True,
-            samesite="none" if is_production else "lax",
-            secure=is_production,
+            samesite="lax",
+            secure=False,
             path="/",
             max_age=60 * 60 * 24 * 30,
         )
@@ -285,7 +287,7 @@ def debug_cookies(request: Request):
     }
 
 @router.get("/debug/create-test-session")
-def create_test_session(request: Request):
+def create_test_session():
     """Manually create a test session"""
     test_jwt = make_session_jwt(
         sub="test-sub-123",
@@ -294,17 +296,28 @@ def create_test_session(request: Request):
         picture=""
     )
     
-    origin = request.headers.get("origin", "")
-    is_production = "localhost" not in origin and "127.0.0.1" not in origin
-    
     resp = JSONResponse({"status": "test_session_created"})
     resp.set_cookie(
         key=SESSION_COOKIE,
         value=test_jwt,
         httponly=True,
-        samesite="none" if is_production else "lax",
-        secure=is_production,
+        samesite="lax",
+        secure=False,
         path="/",
         max_age=60 * 60 * 24 * 30,
     )
     return resp
+
+async def auto_sync_gmail_data(user_id: int):
+    """Auto-sync Gmail data after OAuth connection"""
+    try:
+        from ..services.data_sync import data_sync_service
+        from ..db import get_db
+        
+        with next(get_db()) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            if user:
+                count = await data_sync_service.sync_gmail_emails(db, user, max_emails=20)
+                logger.info(f"AUTO_SYNC_COMPLETED: user_id={user_id}, emails={count}")
+    except Exception as e:
+        logger.error(f"AUTO_SYNC_FAILED: user_id={user_id}, error={e}")

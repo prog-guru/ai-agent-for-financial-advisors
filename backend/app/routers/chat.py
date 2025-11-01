@@ -11,6 +11,9 @@ from ..db import get_db, get_settings
 from ..models import Message, Meeting, User
 from ..schemas import MessageOut, MessageIn, MeetingOut, ChatSendResponse
 from ..security import verify_session_jwt
+from ..services.rag import rag_service
+from ..services.data_sync import data_sync_service
+from ..services.agent import agent_service
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 logger = logging.getLogger("chat")
@@ -48,7 +51,7 @@ def _meeting_to_out(m: Meeting) -> MeetingOut:
         id=m.id, title=m.title, start_iso=m.start_iso, end_iso=m.end_iso, attendees=m.attendees
     )
 
-async def generate_ai_response(user_message: str, user_meetings: List[Meeting], db: Session) -> str:
+async def generate_ai_response_with_rag(user_message: str, user_meetings: List[Meeting], rag_context: str, db: Session) -> str:
     """Generate AI response using OpenAI"""
     try:
         # Prepare context from user's meetings
@@ -74,7 +77,11 @@ async def generate_ai_response(user_message: str, user_meetings: List[Meeting], 
         Previous conversation:
         {conversation_history}
         
-        Respond helpfully and naturally to the user's message. If they ask about meetings, use the meeting information provided.
+        Additional context from user's emails and CRM data:
+        {rag_context}
+        
+        IMPORTANT: Use the email context above to answer questions about people, conversations, and details from emails.
+        If the context contains relevant information, use it in your response.
         Keep responses concise but informative."""
         
         client = openai.OpenAI(api_key=get_settings().OPENAI_API_KEY)
@@ -103,9 +110,11 @@ async def generate_ai_response(user_message: str, user_meetings: List[Meeting], 
 
 @router.post("/messages", response_model=ChatSendResponse)
 async def send_message(payload: MessageIn, request: Request, db: Session = Depends(get_db)):
-    """Send a message and get AI response - user-specific"""
+    """Send a message and get AI response - user-specific with agent integration"""
     user = await get_current_user(request, db)
     content = (payload.content or "").strip()
+    
+    print(f"💬 CHAT MESSAGE from {user.email}: {content}")
     
     if not content:
         raise HTTPException(status_code=400, detail="Empty message")
@@ -117,17 +126,77 @@ async def send_message(payload: MessageIn, request: Request, db: Session = Depen
 
     meetings_out: List[MeetingOut] = []
 
-    # Get user's meetings for context
-    user_meetings = db.query(Meeting).filter(Meeting.user_id == user.id).order_by(Meeting.start_iso.asc()).all()
+    # Check if this is a task request (contains action words)
+    task_keywords = ["schedule", "send email", "create contact", "add note", "set up", "arrange", "book"]
+    is_task_request = any(keyword in content.lower() for keyword in task_keywords)
     
-    # Generate AI response
-    ai_response = await generate_ai_response(content, user_meetings, db)
+    print(f"🔍 IS_TASK_REQUEST: {is_task_request}")
     
-    # Handle meeting-related queries
-    if "meeting" in content.lower() or "schedule" in content.lower():
-        # Return some meetings if user asks for them
-        if user_meetings:
-            meetings_out = [_meeting_to_out(mt) for mt in user_meetings[:3]]  # Return up to 3 meetings
+    if is_task_request:
+        print(f"🎯 CREATING AGENT TASK: {content}")
+        # Create an agent task for this request
+        task = await agent_service.create_task(db, user, content, {"source": "chat"})
+        
+        # Process task immediately
+        print(f"▶️ PROCESSING TASK {task.id}")
+        await agent_service.process_task(db, task)
+        
+        # Get updated task status
+        db.refresh(task)
+        print(f"📋 FINAL TASK STATUS: {task.status}")
+        print(f"📋 FINAL TASK RESULT: {task.result}")
+        
+        if task.status == "completed":
+            ai_response = f"✅ Task completed! {task.result}"
+        elif task.status == "waiting_response":
+            ai_response = f"📧 I've sent the email and I'm waiting for a response. {task.result}"
+        elif task.status == "failed":
+            ai_response = f"❌ Task failed: {task.result}"
+        else:
+            ai_response = f"🔄 Task is {task.status}. I'll continue working on it."
+    else:
+        # Handle as regular chat with RAG
+        user_meetings = db.query(Meeting).filter(Meeting.user_id == user.id).order_by(Meeting.start_iso.asc()).all()
+        
+        # Get RAG context from user's Gmail/HubSpot data
+        rag_context = rag_service.get_context_for_query(db, user.id, content)
+        
+        # Auto-sync Gmail if no context found and no emails exist
+        if not rag_context:
+            from ..models import GmailEmail
+            existing_emails = db.query(GmailEmail).filter(GmailEmail.user_id == user.id).count()
+            
+            if existing_emails == 0:
+                try:
+                    logger.info("No emails found, auto-syncing Gmail data...")
+                    count = await data_sync_service.sync_gmail_emails(db, user, max_emails=10)
+                    logger.info(f"Auto-synced {count} emails")
+                    # Try getting context again after sync
+                    rag_context = rag_service.get_context_for_query(db, user.id, content)
+                except Exception as e:
+                    logger.error(f"Auto-sync failed: {e}")
+            else:
+                logger.info(f"Found {existing_emails} emails but no RAG context for query")
+        
+        logger.info(f"RAG context found: {len(rag_context)} characters for query: {content[:50]}")
+        if rag_context:
+            logger.info(f"RAG context preview: {rag_context[:500]}...")
+        else:
+            logger.warning(f"No RAG context found for query: {content}")
+        
+        # Generate AI response with RAG context
+        if not rag_context:
+            print(f"DEBUG: No RAG context found, using fallback response")
+            ai_response = "I couldn't find any relevant information in your emails or CRM data to answer that question. You may need to sync more data or the information might not be available."
+        else:
+            print(f"DEBUG: Using RAG context with {len(rag_context)} characters")
+            ai_response = await generate_ai_response_with_rag(content, user_meetings, rag_context, db)
+        
+        # Handle meeting-related queries
+        if "meeting" in content.lower() or "schedule" in content.lower():
+            # Return some meetings if user asks for them
+            if user_meetings:
+                meetings_out = [_meeting_to_out(mt) for mt in user_meetings[:3]]  # Return up to 3 meetings
     
     # Store AI response with user_id
     asst_msg = Message(role="assistant", content=ai_response, user_id=user.id)
@@ -135,14 +204,19 @@ async def send_message(payload: MessageIn, request: Request, db: Session = Depen
     db.commit()
     db.refresh(user_msg)
     db.refresh(asst_msg)
+    
+    print(f"💬 CHAT RESPONSE: {ai_response}")
 
-    return ChatSendResponse(
+    response = ChatSendResponse(
         messages=[
             MessageOut(id=user_msg.id, role=user_msg.role, content=user_msg.content, created_at=user_msg.created_at),
             MessageOut(id=asst_msg.id, role=asst_msg.role, content=asst_msg.content, created_at=asst_msg.created_at),
         ],
         meetings=meetings_out,
     )
+    
+    print(f"🚀 SENDING CHAT RESPONSE")
+    return response
 
 @router.post("/clear", response_model=ChatSendResponse)
 async def clear_chat(request: Request, db: Session = Depends(get_db)):
@@ -163,3 +237,57 @@ async def get_meetings(request: Request, db: Session = Depends(get_db)):
     
     rows = db.query(Meeting).filter(Meeting.user_id == user.id).order_by(Meeting.start_iso.asc()).all()
     return [_meeting_to_out(mt) for mt in rows]
+
+@router.post("/sync-gmail")
+async def sync_gmail_data(request: Request, db: Session = Depends(get_db)):
+    """Sync Gmail data and create embeddings"""
+    user = await get_current_user(request, db)
+    
+    try:
+        count = await data_sync_service.sync_gmail_emails(db, user, max_emails=50)
+        return {"message": f"Synced {count} emails successfully"}
+    except Exception as e:
+        logger.error(f"Gmail sync error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/sync-gmail")
+async def sync_gmail_data_get(request: Request, db: Session = Depends(get_db)):
+    """Sync Gmail data - GET version for easy testing"""
+    return await sync_gmail_data(request, db)
+
+@router.get("/rag-status")
+async def check_rag_status(request: Request, db: Session = Depends(get_db)):
+    """Check RAG data status"""
+    user = await get_current_user(request, db)
+    
+    from ..models import GmailEmail, DocumentEmbedding
+    
+    emails_count = db.query(GmailEmail).filter(GmailEmail.user_id == user.id).count()
+    embeddings_count = db.query(DocumentEmbedding).filter(DocumentEmbedding.user_id == user.id).count()
+    
+    return {
+        "user_email": user.email,
+        "gmail_emails": emails_count,
+        "embeddings": embeddings_count,
+        "rag_ready": embeddings_count > 0
+    }
+
+@router.get("/test-search")
+async def test_search(request: Request, query: str = "gmail", db: Session = Depends(get_db)):
+    """Test RAG similarity search"""
+    user = await get_current_user(request, db)
+    
+    results = rag_service.similarity_search(db, user.id, query, limit=5)
+    
+    return {
+        "query": query,
+        "results": [
+            {
+                "similarity": similarity,
+                "content_preview": doc.content[:200],
+                "source_type": doc.source_type,
+                "metadata": doc.meta_data
+            }
+            for doc, similarity in results
+        ]
+    }

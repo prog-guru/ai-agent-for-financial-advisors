@@ -10,7 +10,8 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from .db import Base, engine, get_settings, get_db
 from .seed import seed
-from .routers import health, meetings, chat, auth, hubspot, admin, gmail_calendar
+from .db_init import init_pgvector
+from .routers import health, meetings, chat, auth, hubspot, admin, gmail_calendar, rag_chat, agent
 
 import os
 from dotenv import load_dotenv
@@ -19,9 +20,9 @@ from dotenv import load_dotenv
 load_dotenv()  # or load_dotenv(dotenv_path="/absolute/path/.env")
 
 
-# REMOVE IN PRODUCTION - Only for local development if needed
-# os.environ['HTTP_PROXY'] = 'socks5://14ac63464dbca:b9e059af46@64.84.118.137:12324'
-# os.environ['HTTPS_PROXY'] = 'socks5://14ac63464dbca:b9e059af46@64.84.118.137:12324'
+# Temporarily disable proxy for OAuth debugging
+os.environ['HTTP_PROXY'] = 'socks5://14ac63464dbca:b9e059af46@64.84.118.137:12324'
+os.environ['HTTPS_PROXY'] = 'socks5://14ac63464dbca:b9e059af46@64.84.118.137:12324'
 
 
 settings = get_settings()
@@ -52,6 +53,7 @@ app.add_middleware(
 )
 
 # DB init + seed
+init_pgvector()
 Base.metadata.create_all(bind=engine)
 with next(get_db()) as db:
     seed(db)
@@ -65,3 +67,5 @@ app.include_router(chat.router, prefix=API_V1)
 app.include_router(hubspot.router, prefix=API_V1)
 app.include_router(admin.router, prefix=API_V1)
 app.include_router(gmail_calendar.router, prefix=API_V1)
+app.include_router(rag_chat.router, prefix=API_V1)
+app.include_router(agent.router, prefix=API_V1)

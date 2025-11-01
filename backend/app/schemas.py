@@ -39,3 +39,25 @@ class MessageIn(BaseModel):
 class ChatSendResponse(BaseModel):
     messages: List[MessageOut]
     meetings: List[MeetingOut]
+
+class AgentTaskOut(BaseModel):
+    id: int
+    description: str
+    status: str
+    context: Dict[str, Any]
+    result: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+class AgentTaskCreate(BaseModel):
+    description: str
+    context: Dict[str, Any] = Field(default_factory=dict)
+
+class AgentInstructionOut(BaseModel):
+    id: int
+    instruction: str
+    is_active: bool
+    created_at: datetime
+
+class AgentInstructionCreate(BaseModel):
+    instruction: str
